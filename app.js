@@ -1,19 +1,17 @@
-// Personal Finance Tracker Logic - Sam's Networth (Upgraded)
+// Personal Finance Tracker Logic - Sam's Networth (Connected to Neon DB)
 
 const GOAL_START = -500000; // -5 Lakhs INR
 const GOAL_TARGET = 1000000; // +10 Lakhs INR
 const TARGET_DATE = new Date('2026-12-31');
 
-// State Object
+// Local State Copy (synced with database)
 let state = {
   bankBalance: 0,
   debtBalance: -500000,
   stockInvestment: 0,
-  budgetLimit: 0, // 0 means unset
+  budgetLimit: 0,
   transactions: [],
-  netWorthHistory: [
-    { date: '2026-07-15', netWorth: -500000 } // Baseline snapshot
-  ]
+  netWorthHistory: []
 };
 
 // Selected Date for calendar logging
@@ -24,12 +22,10 @@ let currentCalendarYear = new Date().getFullYear();
 // Chart Instances
 let trendChartInstance = null;
 let breakdownChartInstance = null;
-let currentBreakdownTab = 'mix'; // 'mix' or 'spend'
+let currentBreakdownTab = 'mix';
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
-  loadData();
-  
   const today = new Date();
   const initDate = (today.getFullYear() === 2026) ? today : new Date('2026-07-15');
   
@@ -40,72 +36,100 @@ document.addEventListener('DOMContentLoaded', () => {
   // Setup Event Listeners
   setupEventListeners();
 
-  // Populate Forms
-  document.getElementById('bank-balance').value = state.bankBalance;
-  document.getElementById('debt-balance').value = state.debtBalance;
-  document.getElementById('stock-investment').value = state.stockInvestment;
-  document.getElementById('budget-limit').value = state.budgetLimit || '';
-
-  // Render Page Elements
-  updateUI();
+  // Load state from Neon Database
+  loadData();
   
   // Initialize Lucide Icons
   lucide.createIcons();
 });
 
-// Load state from localStorage
-function loadData() {
-  const savedState = localStorage.getItem('sams_wealth_state_v3');
-  if (savedState) {
-    try {
-      state = JSON.parse(savedState);
-      if (state.budgetLimit === undefined) state.budgetLimit = 0;
-    } catch (e) {
-      console.error("Failed to parse saved state, loading default clean slate", e);
+// Load state from DB
+async function loadData() {
+  try {
+    const res = await fetch('/api/state');
+    if (!res.ok) throw new Error('Database response not OK');
+    const dbState = await res.json();
+    
+    state = dbState;
+    
+    // Sync forms
+    document.getElementById('bank-balance').value = state.bankBalance;
+    document.getElementById('debt-balance').value = state.debtBalance;
+    document.getElementById('stock-investment').value = state.stockInvestment;
+    document.getElementById('budget-limit').value = state.budgetLimit || '';
+
+    // Render Page Elements
+    updateUI();
+  } catch (err) {
+    console.error("Failed to load state from Neon DB, running local fallback", err);
+    // Local storage fallback if offline
+    const local = localStorage.getItem('sams_wealth_local_fallback');
+    if (local) {
+      state = JSON.parse(local);
+      updateUI();
     }
-  } else {
-    saveData();
   }
 }
 
-// Save state to localStorage
-function saveData() {
-  localStorage.setItem('sams_wealth_state_v3', JSON.stringify(state));
+// Save backup copy to local storage just in case
+function saveLocalFallback() {
+  localStorage.setItem('sams_wealth_local_fallback', JSON.stringify(state));
 }
 
 // Setup Event Listeners
 function setupEventListeners() {
-  // Bank, Debt & Budget Form Submission
-  document.getElementById('bank-form').addEventListener('submit', (e) => {
+  // Bank & Debt Form Submission
+  document.getElementById('bank-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const bankVal = parseFloat(document.getElementById('bank-balance').value) || 0;
     const debtVal = parseFloat(document.getElementById('debt-balance').value) || 0;
     const budgetVal = parseFloat(document.getElementById('budget-limit').value) || 0;
     
-    state.bankBalance = bankVal;
-    state.debtBalance = debtVal;
-    state.budgetLimit = budgetVal;
-
-    const currentNetWorth = bankVal + state.stockInvestment + debtVal;
-    recordNetWorthSnapshot(currentNetWorth);
-    saveData();
-    updateUI();
+    try {
+      const res = await fetch('/api/portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankBalance: bankVal, debtBalance: debtVal, budgetLimit: budgetVal })
+      });
+      if (res.ok) {
+        // Reload fresh state from DB to sync charts and history
+        await loadData();
+      }
+    } catch (err) {
+      console.error('Failed to update portfolio on DB', err);
+      // Fallback update
+      state.bankBalance = bankVal;
+      state.debtBalance = debtVal;
+      state.budgetLimit = budgetVal;
+      saveLocalFallback();
+      updateUI();
+    }
   });
 
   // Stock Form Submission
-  document.getElementById('stock-form').addEventListener('submit', (e) => {
+  document.getElementById('stock-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const stockVal = parseFloat(document.getElementById('stock-investment').value) || 0;
-    state.stockInvestment = stockVal;
-
-    const currentNetWorth = state.bankBalance + stockVal + state.debtBalance;
-    recordNetWorthSnapshot(currentNetWorth);
-    saveData();
-    updateUI();
+    
+    try {
+      const res = await fetch('/api/stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stockInvestment: stockVal })
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } catch (err) {
+      console.error('Failed to update stock investment on DB', err);
+      state.stockInvestment = stockVal;
+      saveLocalFallback();
+      updateUI();
+    }
   });
 
   // Daily Log Form
-  document.getElementById('daily-log-form').addEventListener('submit', (e) => {
+  document.getElementById('daily-log-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const type = document.getElementById('entry-type').value;
     const amount = parseFloat(document.getElementById('entry-amount').value) || 0;
@@ -125,27 +149,28 @@ function setupEventListeners() {
       autoAdjusted: autoAdjust
     };
 
-    state.transactions.push(newLog);
-
-    if (autoAdjust) {
-      if (type === 'gain') {
-        state.bankBalance += amount;
-      } else {
-        state.bankBalance -= amount;
+    try {
+      const res = await fetch('/api/transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLog)
+      });
+      if (res.ok) {
+        await loadData();
+        // Reset log fields
+        document.getElementById('entry-amount').value = '';
+        document.getElementById('entry-desc').value = '';
       }
-      document.getElementById('bank-balance').value = state.bankBalance;
+    } catch (err) {
+      console.error('Failed to save transaction on DB', err);
+      state.transactions.push(newLog);
+      if (autoAdjust) {
+        if (type === 'gain') state.bankBalance += amount;
+        else state.bankBalance -= amount;
+      }
+      saveLocalFallback();
+      updateUI();
     }
-
-    // Recalculate Net Worth and record Snapshot
-    const currentNetWorth = state.bankBalance + state.stockInvestment + state.debtBalance;
-    recordNetWorthSnapshot(currentNetWorth);
-
-    saveData();
-    updateUI();
-
-    // Reset log input fields
-    document.getElementById('entry-amount').value = '';
-    document.getElementById('entry-desc').value = '';
   });
 
   // Export JSON backup
@@ -164,7 +189,7 @@ function setupEventListeners() {
     exportToCSV();
   });
 
-  // Import Data Button Logic
+  // Import Data Button Logic (JSON RESTORE)
   const fileInput = document.getElementById('import-file');
   document.getElementById('import-btn-trigger').addEventListener('click', () => {
     fileInput.click();
@@ -175,28 +200,50 @@ function setupEventListeners() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const importedState = JSON.parse(evt.target.result);
         if (typeof importedState.bankBalance === 'number' && Array.isArray(importedState.transactions)) {
+          
+          // Seed the whole imported state to DB
+          // For simplicity we can update the backend with all transactions
+          // But to prevent complex batch REST API imports, we can directly update cash and run loop for transactions.
+          // Let's notify user and update state.
           state = importedState;
-          if (state.debtBalance === undefined) state.debtBalance = -500000;
-          if (state.budgetLimit === undefined) state.budgetLimit = 0;
-          saveData();
           
-          // Sync UI inputs
-          document.getElementById('bank-balance').value = state.bankBalance;
-          document.getElementById('debt-balance').value = state.debtBalance;
-          document.getElementById('stock-investment').value = state.stockInvestment;
-          document.getElementById('budget-limit').value = state.budgetLimit || '';
-          
-          updateUI();
-          alert('Backup restored successfully!');
+          // Push cash updates
+          await fetch('/api/portfolio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bankBalance: state.bankBalance,
+              debtBalance: state.debtBalance || -500000,
+              budgetLimit: state.budgetLimit || 0
+            })
+          });
+
+          await fetch('/api/stock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stockInvestment: state.stockInvestment })
+          });
+
+          // Upload transactions sequentially
+          for (let t of state.transactions) {
+            await fetch('/api/transaction', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...t, autoAdjusted: false }) // Avoid duplicate balance updates
+            });
+          }
+
+          await loadData();
+          alert('Backup restored to database successfully!');
         } else {
           alert('Invalid backup file structure.');
         }
       } catch (err) {
-        alert('Failed to parse backup file.');
+        alert('Failed to restore backup file.');
       }
     };
     reader.readAsText(file);
@@ -237,13 +284,12 @@ function recordNetWorthSnapshot(currentNetWorth) {
   const todayStr = selectedDateStr || formatDateString(new Date());
   
   state.netWorthHistory = state.netWorthHistory.filter(h => h.date !== todayStr);
-  
   state.netWorthHistory.push({
     date: todayStr,
     netWorth: currentNetWorth
   });
-  
   state.netWorthHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+  saveLocalFallback();
 }
 
 // Update complete interface
@@ -257,7 +303,7 @@ function updateUI() {
   const totalRange = GOAL_TARGET - GOAL_START; // 15L range
   const covered = currentNetWorth - GOAL_START;
   let percent = Math.floor((covered / totalRange) * 100);
-  percent = Math.max(0, Math.min(100, percent)); // clamp 0-100
+  percent = Math.max(0, Math.min(100, percent));
 
   const fillElement = document.getElementById('progress-fill');
   const percentBubble = document.getElementById('progress-percent');
@@ -266,11 +312,10 @@ function updateUI() {
   
   document.getElementById('progress-val-text').textContent = formatCurrency(currentNetWorth);
 
-  // Milestone marker active tags
+  // Milestone markers
   const markers = document.querySelectorAll('.milestone-marker');
   markers.forEach(m => m.classList.remove('active'));
   
-  // Milestones: -5L, 0, +5L, +10L
   markers[0].classList.add('active'); // Always active (-5L start)
   if (currentNetWorth >= 0) markers[1].classList.add('active'); // Debt Free
   if (currentNetWorth >= 500000) markers[2].classList.add('active'); // Halfway
@@ -380,7 +425,6 @@ function updateStreaks() {
     return;
   }
 
-  // Aggregate gains & losses by day
   const dailyBalances = {};
   state.transactions.forEach(t => {
     if (!dailyBalances[t.date]) {
@@ -393,13 +437,9 @@ function updateStreaks() {
     }
   });
 
-  // Sort dates chronologically
   const activeDates = Object.keys(dailyBalances).sort((a, b) => new Date(b) - new Date(a));
   
   let streak = 0;
-  const todayStr = formatDateString(new Date());
-  
-  // Starting from today (or the latest entry date), calculate backward streak
   let checkDate = new Date();
   if (activeDates.length > 0 && new Date(activeDates[0]) > checkDate) {
     checkDate = new Date(activeDates[0]);
@@ -411,25 +451,18 @@ function updateStreaks() {
       if (dailyBalances[checkStr] >= 0) {
         streak++;
       } else {
-        break; // Expense day stops streak
-      }
-    } else {
-      // Inactive days: if there are no logs at all, check if streak has started
-      if (streak > 0) {
-        // Allow gaps in logging without breaking streak, or break it? Let's keep streak strict to days with logged activity
+        break;
       }
     }
-    // Step back 1 day
     checkDate.setDate(checkDate.getDate() - 1);
   }
 
   streakBox.textContent = `${streak} Day${streak !== 1 ? 's' : ''}`;
 }
 
-// Calculate projected goal date based on average savings velocity
+// Calculate projected goal date
 function updateProjections(currentNetWorth) {
   const projBox = document.getElementById('stat-projected-date');
-  
   const sortedHistory = [...state.netWorthHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
   
   if (sortedHistory.length < 2) {
@@ -471,7 +504,7 @@ function updateProjections(currentNetWorth) {
   projBox.textContent = projectedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
-// Monthly budget tracking checks
+// Monthly budget tracking
 function updateBudget() {
   const container = document.getElementById('budget-progress-section');
   const fill = document.getElementById('budget-bar-fill');
@@ -484,10 +517,9 @@ function updateBudget() {
 
   container.style.display = 'block';
 
-  // Calculate expenses this calendar month
   const today = new Date();
   const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1; // 1-indexed
+  const currentMonth = today.getMonth() + 1;
 
   const monthlyExpenses = state.transactions
     .filter(t => {
@@ -509,7 +541,7 @@ function updateBudget() {
   }
 }
 
-// Export Ledger to CSV format
+// Export CSV format
 function exportToCSV() {
   if (state.transactions.length === 0) {
     alert('No transaction ledger data to export!');
@@ -690,28 +722,30 @@ function updateSelectedDateUI() {
 }
 
 // Delete Logged transaction
-function deleteTransaction(id) {
-  const transIndex = state.transactions.findIndex(t => t.id === id);
-  if (transIndex === -1) return;
-
-  const t = state.transactions[transIndex];
-
-  if (t.autoAdjusted) {
-    if (t.type === 'gain') {
-      state.bankBalance -= t.amount;
-    } else {
-      state.bankBalance += t.amount;
+async function deleteTransaction(id) {
+  try {
+    const res = await fetch(`/api/transaction/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      await loadData();
     }
-    document.getElementById('bank-balance').value = state.bankBalance;
-  }
+  } catch (err) {
+    console.error('Failed to delete transaction on DB', err);
+    // Local fallback reversal
+    const transIndex = state.transactions.findIndex(t => t.id === id);
+    if (transIndex === -1) return;
 
-  state.transactions.splice(transIndex, 1);
-  
-  const currentNetWorth = state.bankBalance + state.stockInvestment + state.debtBalance;
-  recordNetWorthSnapshot(currentNetWorth);
-  
-  saveData();
-  updateUI();
+    const t = state.transactions[transIndex];
+    if (t.autoAdjusted) {
+      if (t.type === 'gain') state.bankBalance -= t.amount;
+      else state.bankBalance += t.amount;
+      document.getElementById('bank-balance').value = state.bankBalance;
+    }
+    state.transactions.splice(transIndex, 1);
+    const currentNetWorth = state.bankBalance + state.stockInvestment + state.debtBalance;
+    recordNetWorthSnapshot(currentNetWorth);
+    saveLocalFallback();
+    updateUI();
+  }
 }
 
 // RENDER TREND CHART (Line Chart)
@@ -830,7 +864,6 @@ function renderBreakdownChart() {
     data = [bankVal, stockVal, debtVal];
     bgColors = ['#3b82f6', '#e05320', '#ef4444'];
   } else {
-    // Group losses by Category
     const categoriesMap = {};
     
     state.transactions
@@ -843,7 +876,6 @@ function renderBreakdownChart() {
     labels = Object.keys(categoriesMap);
     data = Object.values(categoriesMap);
     
-    // Auto-generate some orange/red accent shades for spending categories
     bgColors = labels.map((_, index) => {
       const shades = ['#e05320', '#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#b45309', '#78350f'];
       return shades[index % shades.length];
@@ -900,7 +932,6 @@ function renderHeatmap() {
   
   grid.innerHTML = '';
 
-  // Get daily balances of gains vs losses
   const dailyBalances = {};
   state.transactions.forEach(t => {
     if (!dailyBalances[t.date]) {
@@ -913,14 +944,11 @@ function renderHeatmap() {
     }
   });
 
-  // Generate last 24 weeks (168 days) up to today
   const cellsCount = 168;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - cellsCount + 1);
 
-  // Align start day to Sunday for columns mapping
   const startDay = startDate.getDay();
-  // Adjust start to align columns properly
   startDate.setDate(startDate.getDate() - startDay);
 
   for (let i = 0; i < cellsCount + startDay; i++) {
@@ -933,21 +961,15 @@ function renderHeatmap() {
     const cell = document.createElement('div');
     cell.classList.add('heatmap-cell');
     
-    // Assign tooltip info
     const dayLabel = currentCellDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
     let valueLabel = 'No activities logged';
     if (cellValue > 0) {
       valueLabel = `+₹${cellValue.toLocaleString('en-IN')}`;
-      
-      // Determine intensity
       if (cellValue < 5000) cell.classList.add('gain-low');
       else if (cellValue < 25000) cell.classList.add('gain-med');
       else cell.classList.add('gain-high');
-      
     } else if (cellValue < 0) {
       valueLabel = `-₹${Math.abs(cellValue).toLocaleString('en-IN')}`;
-      
-      // Determine intensity
       if (Math.abs(cellValue) < 5000) cell.classList.add('loss-low');
       else if (Math.abs(cellValue) < 15000) cell.classList.add('loss-med');
       else cell.classList.add('loss-high');
