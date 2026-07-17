@@ -414,7 +414,7 @@ function updateUI() {
   // 6. Monthly Budget checks
   updateBudget();
 
-  // 6b. Calculate calendar sidebar statistics (Month Gains & Week Losses)
+  // 6b. Calculate calendar sidebar statistics (Month Gains & Month Losses)
   const monthlyGains = state.transactions
     .filter(t => {
       const dateParts = t.date.split('-');
@@ -424,28 +424,17 @@ function updateUI() {
     })
     .reduce((sum, t) => sum + t.amount, 0);
 
-  let weeklyLosses = 0;
-  if (selectedDateStr) {
-    const selDate = new Date(selectedDateStr);
-    const selDayOfWeek = selDate.getDay();
-    const startOfWeek = new Date(selDate);
-    startOfWeek.setDate(selDate.getDate() - selDayOfWeek);
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
-
-    weeklyLosses = state.transactions
-      .filter(t => {
-        const tDate = new Date(t.date);
-        return t.type === 'loss' && tDate >= startOfWeek && tDate <= endOfWeek;
-      })
-      .reduce((sum, t) => sum + t.amount, 0);
-  }
+  const monthlyLosses = state.transactions
+    .filter(t => {
+      const dateParts = t.date.split('-');
+      const tYear = parseInt(dateParts[0]);
+      const tMonth = parseInt(dateParts[1]) - 1;
+      return t.type === 'loss' && tYear === currentCalendarYear && tMonth === currentCalendarMonth;
+    })
+    .reduce((sum, t) => sum + t.amount, 0);
 
   document.getElementById('cal-month-gain').textContent = `₹${monthlyGains.toLocaleString('en-IN')}`;
-  document.getElementById('cal-week-loss').textContent = `₹${weeklyLosses.toLocaleString('en-IN')}`;
+  document.getElementById('cal-month-loss').textContent = `₹${monthlyLosses.toLocaleString('en-IN')}`;
 
   // 7. Update Calendar UI & selected date display
   renderCalendar();
