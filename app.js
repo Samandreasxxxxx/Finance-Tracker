@@ -414,7 +414,23 @@ function updateUI() {
   // 6. Monthly Budget checks
   updateBudget();
 
-  // 6b. Calculate calendar sidebar statistics (Month Gains & Month Losses)
+  // 6b. Calculate calendar header statistics (Month Gains & Month Losses)
+  updateCalendarHeaderStats();
+
+  // 7. Update Calendar UI & selected date display
+  renderCalendar();
+  updateSelectedDateUI();
+
+  // 8. Heatmap Renderer
+  renderHeatmap();
+
+  // 9. Update Charts
+  renderTrendChart();
+  renderBreakdownChart();
+}
+
+// Calculate monthly calendar stats dynamically for the active calendar month
+function updateCalendarHeaderStats() {
   const monthlyGains = state.transactions
     .filter(t => {
       const dateParts = t.date.split('-');
@@ -435,17 +451,6 @@ function updateUI() {
 
   document.getElementById('cal-month-gain').textContent = `₹${monthlyGains.toLocaleString('en-IN')}`;
   document.getElementById('cal-month-loss').textContent = `₹${monthlyLosses.toLocaleString('en-IN')}`;
-
-  // 7. Update Calendar UI & selected date display
-  renderCalendar();
-  updateSelectedDateUI();
-
-  // 8. Heatmap Renderer
-  renderHeatmap();
-
-  // 9. Update Charts
-  renderTrendChart();
-  renderBreakdownChart();
 }
 
 // Calculate and render trend arrow + percentage
@@ -662,6 +667,7 @@ function toggleBreakdownTab(tab) {
 function renderCalendar() {
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   document.getElementById('calendar-month-year').textContent = `${monthNames[currentCalendarMonth]} ${currentCalendarYear}`;
+  updateCalendarHeaderStats();
 
   const daysGrid = document.getElementById('calendar-days-grid');
   daysGrid.innerHTML = '';
