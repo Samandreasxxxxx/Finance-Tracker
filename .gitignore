@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Production Build Output
+dist/
+
+# Local env files
+.env
+.env.local
+
+# IDE configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sam's Networth Tracker | -5L to +10L INR</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <i data-lucide="trending-up" class="orange-text"></i>
+        <h1>Sam's Networth</h1>
+        <div id="header-trend-indicator" class="header-trend-wrapper">
+          <!-- Populated by JS: arrow and percentage -->
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="export-csv-btn" class="btn btn-outline" title="Export Ledger to CSV">
+          <i data-lucide="table"></i>
+          <span>Export CSV</span>
+        </button>
+        <button id="export-btn" class="btn btn-outline" title="Backup Data to JSON">
+          <i data-lucide="download"></i>
+          <span>Backup JSON</span>
+        </button>
+        <button id="import-btn-trigger" class="btn btn-outline" title="Restore Data from Backup">
+          <i data-lucide="upload"></i>
+          <span>Restore Backup</span>
+        </button>
+        <input type="file" id="import-file" style="display: none;" accept=".json">
+      </div>
+    </header>
+
+    <!-- Main Grid Layout -->
+    <main class="dashboard-grid">
+      
+      <!-- Top Hero: Goal Progress -->
+      <section class="grid-col-12 card hero-card">
+        <div class="hero-header">
+          <div>
+            <span class="badge">MISSION 2026</span>
+            <h2>Goal Progress (-5 Lakhs to +10 Lakhs INR)</h2>
+          </div>
+          <div class="days-remaining">
+            <span class="days-num" id="days-left">--</span>
+            <span class="days-label">Days Left to Goal</span>
+          </div>
+        </div>
+
+        <!-- The Progress Bar -->
+        <div class="progress-container">
+          <div class="progress-labels">
+            <span class="progress-start">-5.0L INR</span>
+            <span class="progress-current" id="progress-val-text">₹0</span>
+            <span class="progress-end">+10.0L INR</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-bar-fill" id="progress-fill" style="width: 0%">
+              <span class="progress-percentage-bubble" id="progress-percent">0%</span>
+            </div>
+          </div>
+          <div class="progress-milestones">
+            <div class="milestone-marker" style="left: 0%;">
+              <span class="dot"></span>
+              <span class="label">-5L (Start)</span>
+            </div>
+            <div class="milestone-marker" style="left: 33.33%;">
+              <span class="dot"></span>
+              <span class="label">₹0 (Debt Free)</span>
+            </div>
+            <div class="milestone-marker" style="left: 66.66%;">
+              <span class="dot"></span>
+              <span class="label">+5L (Halfway)</span>
+            </div>
+            <div class="milestone-marker" style="left: 100%;">
+              <span class="dot"></span>
+              <span class="label">+10L (Goal)</span>
+            </div>
+          </div>
+          <div class="progress-footer">
+            <span id="progress-status-desc">Calculating status...</span>
+            <span id="target-remaining">Target remaining: ₹--</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bank & Cash Balance Card with Budgeting -->
+      <section class="grid-col-4 card portfolio-section-card">
+        <h3 class="card-title">
+          <i data-lucide="wallet" class="orange-text"></i>
+          Bank & Cash Balance
+        </h3>
+        <form id="bank-form" class="portfolio-inputs">
+          <div class="input-group">
+            <label for="bank-balance">Cash / Bank Balance (INR)</label>
+            <div class="input-wrapper">
+              <span class="input-prefix">₹</span>
+              <input type="number" id="bank-balance" placeholder="e.g. 0" min="0" step="any">
+            </div>
+          </div>
+          <div class="input-group">
+            <label for="debt-balance">Outstanding Debt (INR)</label>
+            <div class="input-wrapper">
+              <span class="input-prefix">₹</span>
+              <input type="number" id="debt-balance" placeholder="e.g. -500000" step="any">
+            </div>
+          </div>
+          <div class="input-group">
+            <label for="budget-limit">Monthly Expense Budget (INR)</label>
+            <div class="input-wrapper">
+              <span class="input-prefix">₹</span>
+              <input type="number" id="budget-limit" placeholder="e.g. 30000" min="0" step="any">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Update Cash, Debt & Budget</button>
+        </form>
+
+        <!-- Budget Tracker UI -->
+        <div id="budget-progress-section" class="budget-progress-container" style="display: none;">
+          <hr class="card-divider">
+          <div class="budget-stats">
+            <span>Monthly Budget Used:</span>
+            <strong id="budget-used-text">₹0 / ₹0</strong>
+          </div>
+          <div class="budget-bar-track">
+            <div id="budget-bar-fill" class="budget-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stock Investments Card (Separate place) -->
+      <section class="grid-col-4 card portfolio-section-card">
+        <h3 class="card-title">
+          <i data-lucide="bar-chart-2" class="orange-text"></i>
+          Stock Portfolio
+        </h3>
+        <form id="stock-form" class="portfolio-inputs">
+          <div class="input-group">
+            <label for="stock-investment">Stock Assets (INR)</label>
+            <div class="input-wrapper">
+              <span class="input-prefix">₹</span>
+              <input type="number" id="stock-investment" placeholder="e.g. 0" min="0" step="any">
+            </div>
+            <p class="input-help">Update stocks balance manually whenever you wish</p>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Update Stocks Balance</button>
+        </form>
+      </section>
+
+      <!-- Upgraded Overview Card with Streaks & Projections -->
+      <section class="grid-col-4 card portfolio-section-card">
+        <h3 class="card-title">
+          <i data-lucide="activity" class="orange-text"></i>
+          Networth Overview
+        </h3>
+        <div class="quick-stats-vertical">
+          <div class="stat-box">
+            <span class="stat-box-label">Current Networth</span>
+            <div class="stat-box-value orange-text" id="stat-net-worth">₹0</div>
+          </div>
+          <div class="stat-box-row">
+            <div class="stat-box-half">
+              <span class="stat-box-label">Daily Required Save</span>
+              <div class="stat-box-subvalue" id="stat-daily-req">₹0</div>
+            </div>
+            <div class="stat-box-half">
+              <span class="stat-box-label">Daily Growth Change</span>
+              <div class="stat-box-subvalue" id="stat-daily-change">0.00%</div>
+            </div>
+          </div>
+          <div class="stat-box-row">
+            <div class="stat-box-half">
+              <span class="stat-box-label">Savings Streak</span>
+              <div class="stat-box-subvalue" id="stat-streak">0 Days</div>
+            </div>
+            <div class="stat-box-half">
+              <span class="stat-box-label">Projected Goal Hit</span>
+              <div class="stat-box-subvalue" id="stat-projected-date">Calculating...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Calendar Log Section -->
+      <section class="grid-col-7 card calendar-card">
+        <h3 class="card-title">
+          <i data-lucide="calendar" class="orange-text"></i>
+          Activity Calendar (Daily Earnings & Losses)
+        </h3>
+        
+        <!-- Calendar Widget -->
+        <div class="calendar-widget">
+          <div class="calendar-nav">
+            <button id="prev-month" class="btn-icon"><i data-lucide="chevron-left"></i></button>
+            <span id="calendar-month-year">--</span>
+            <button id="next-month" class="btn-icon"><i data-lucide="chevron-right"></i></button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+          </div>
+          <div class="calendar-days" id="calendar-days-grid">
+            <!-- Days injected by JS -->
+          </div>
+        </div>
+
+        <div class="calendar-legend">
+          <span class="legend-item"><span class="dot gain"></span> Gain Logged</span>
+          <span class="legend-item"><span class="dot loss"></span> Loss Logged</span>
+        </div>
+      </section>
+
+      <!-- Upgraded Log Entry Panel with Category dropdown -->
+      <section class="grid-col-5 card log-panel-card">
+        <h3 class="card-title" id="log-panel-title">
+          <i data-lucide="plus-circle" class="orange-text"></i>
+          Log for Today
+        </h3>
+        <p class="selected-date-text" id="selected-date-display">Select a date to log details</p>
+
+        <form id="daily-log-form" class="log-form">
+          <div class="input-row-group">
+            <div class="input-group flex-1">
+              <label for="entry-type">Type</label>
+              <select id="entry-type">
+                <option value="gain">Gain (Earned / Profit)</option>
+                <option value="loss">Loss (Spent / Expense)</option>
+              </select>
+            </div>
+
+            <div class="input-group flex-1">
+              <label for="entry-amount">Amount (INR)</label>
+              <div class="input-wrapper">
+                <span class="input-prefix">₹</span>
+                <input type="number" id="entry-amount" placeholder="0" min="0" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="input-row-group">
+            <div class="input-group flex-1">
+              <label for="entry-category">Category</label>
+              <select id="entry-category">
+                <!-- Gains -->
+                <option value="Salary">Salary (Gain)</option>
+                <option value="Investments">Investments / Stocks (Gain/Loss)</option>
+                <option value="Side Hustle">Side Hustle (Gain)</option>
+                <!-- Losses -->
+                <option value="Food & Groceries">Food & Groceries (Loss)</option>
+                <option value="Rent & Housing">Rent & Housing (Loss)</option>
+                <option value="Utilities">Utilities & Bills (Loss)</option>
+                <option value="Leisure & Entertainment">Leisure & Shopping (Loss)</option>
+                <option value="Other">Other Category</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="entry-desc">Details / Description</label>
+            <input type="text" id="entry-desc" placeholder="e.g. Salary, Rent, Dividends, Groceries" required>
+          </div>
+
+          <div class="input-group checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="auto-adjust-balance" checked>
+              <span>Auto-adjust Cash Balance</span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block">Save Entry</button>
+        </form>
+
+        <!-- Existing logs list for the selected day -->
+        <div class="day-logs-section">
+          <h4>Logs for selected day</h4>
+          <ul id="day-logs-list" class="day-logs-list">
+            <!-- Log items injected by JS -->
+            <li class="empty-log-msg">No logs for this date.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Upgraded Charts & Visuals (2 Chart Containers) -->
+      <section class="grid-col-7 card chart-card">
+        <h3 class="card-title">
+          <i data-lucide="line-chart" class="orange-text"></i>
+          Net Worth Progress Trend
+        </h3>
+        <div class="chart-container">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </section>
+
+      <section class="grid-col-5 card chart-card">
+        <h3 class="card-title">
+          <i data-lucide="pie-chart" class="orange-text"></i>
+          Financial Mix & Spend Breakdown
+        </h3>
+        <div class="chart-tabs">
+          <button id="tab-mix" class="tab-btn active">Asset Mix</button>
+          <button id="tab-spend" class="tab-btn">Expense Categories</button>
+        </div>
+        <div class="chart-container-donut">
+          <canvas id="breakdownChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Heatmap Card (Span 12) -->
+      <section class="grid-col-12 card heatmap-card">
+        <div class="heatmap-header">
+          <h3 class="card-title">
+            <i data-lucide="grid" class="orange-text"></i>
+            Financial Activity Heatmap (Last 6 Months)
+          </h3>
+          <div class="heatmap-legend">
+            <span>Spent</span>
+            <span class="legend-box scale-1"></span>
+            <span class="legend-box scale-2"></span>
+            <span class="legend-box scale-3"></span>
+            <span class="legend-box scale-neutral"></span>
+            <span class="legend-box scale-5"></span>
+            <span class="legend-box scale-6"></span>
+            <span class="legend-box scale-7"></span>
+            <span>Saved</span>
+          </div>
+        </div>
+        <div class="heatmap-container-outer">
+          <div class="heatmap-labels-days">
+            <span>Sun</span><span>Tue</span><span>Thu</span><span>Sat</span>
+          </div>
+          <div id="heatmap-grid" class="heatmap-grid">
+            <!-- Heatmap cells injected by JS -->
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>&copy; 2026 Sam's Networth. Tracking goal achievement towards 10 Lakhs INR savings.</p>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
