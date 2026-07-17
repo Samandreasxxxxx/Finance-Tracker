@@ -1061,7 +1061,7 @@ function formatCurrency(num) {
   
   let formatted = '';
   if (absNum >= 100000) {
-    formatted = (absNum / 100000).toFixed(2) + ' Lakhs';
+    formatted = (absNum / 100000).toFixed(2) + 'L';
   } else {
     formatted = absNum.toLocaleString('en-IN');
   }
