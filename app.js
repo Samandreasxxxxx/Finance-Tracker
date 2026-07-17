@@ -56,6 +56,9 @@ async function loadData() {
     }
     const dbState = await res.json();
     
+    // Auto-sync any local offline transactions before writing database state
+    await syncOfflineTransactions(dbState);
+    
     state = dbState;
     
     // Sync forms
@@ -68,12 +71,43 @@ async function loadData() {
     updateUI();
   } catch (err) {
     console.error("Failed to load state from Neon DB, running local fallback", err);
-    alert("Database connection offline. Showing local cache fallback data. Error: " + err.message);
+    // Don't show annoying database offline alert on first boot if local fallback is present
     const local = localStorage.getItem('sams_wealth_local_fallback');
     if (local) {
       state = JSON.parse(local);
       updateUI();
+    } else {
+      alert("Database connection offline. Showing fallback interface. Error: " + err.message);
     }
+  }
+}
+
+// Sync local offline transactions to database
+async function syncOfflineTransactions(dbState) {
+  const local = localStorage.getItem('sams_wealth_local_fallback');
+  if (!local) return;
+  
+  try {
+    const localState = JSON.parse(local);
+    const dbTxIds = new Set(dbState.transactions.map(t => t.id));
+    
+    // Find transactions in local fallback that are missing from database
+    const unsynced = localState.transactions.filter(t => !dbTxIds.has(t.id));
+    
+    if (unsynced.length > 0) {
+      console.log(`Syncing ${unsynced.length} offline transactions to Neon DB...`);
+      for (let t of unsynced) {
+        await fetch('/api/transaction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(t)
+        });
+      }
+      // Clear fallback local storage logs once uploaded
+      localStorage.removeItem('sams_wealth_local_fallback');
+    }
+  } catch (e) {
+    console.error("Failed to auto-sync offline data", e);
   }
 }
 
@@ -193,7 +227,7 @@ function setupEventListeners() {
       document.getElementById('entry-desc').value = '';
     } catch (err) {
       console.error('Failed to save transaction on DB', err);
-      alert('Failed to save transaction on DB: ' + err.message);
+      alert('Saving locally (Offline Fallback): ' + err.message);
       state.transactions.push(newLog);
       if (autoAdjust) {
         if (type === 'gain') state.bankBalance += amount;
@@ -737,23 +771,22 @@ async function deleteTransaction(id) {
   try {
     const res = await fetch(`/api/transaction/${id}`, { method: 'DELETE' });
     if (!res.ok) {
+      // If the transaction is not found in database (e.g. was a temporary local-fallback item),
+      // delete it locally anyway to prevent the UI from getting stuck
+      if (res.status === 404) {
+        state.transactions = state.transactions.filter(t => t.id !== id);
+        saveLocalFallback();
+        updateUI();
+        return;
+      }
       const errText = await res.text();
       throw new Error(errText);
     }
     await loadData();
   } catch (err) {
     console.error('Failed to delete transaction on DB', err);
-    alert('Failed to delete transaction on DB: ' + err.message);
-    const transIndex = state.transactions.findIndex(t => t.id === id);
-    if (transIndex === -1) return;
-
-    const t = state.transactions[transIndex];
-    if (t.autoAdjusted) {
-      if (t.type === 'gain') state.bankBalance -= t.amount;
-      else state.bankBalance += t.amount;
-      document.getElementById('bank-balance').value = state.bankBalance;
-    }
-    state.transactions.splice(transIndex, 1);
+    // Graceful client fallback deletion
+    state.transactions = state.transactions.filter(t => t.id !== id);
     const currentNetWorth = state.bankBalance + state.stockInvestment + state.debtBalance;
     recordNetWorthSnapshot(currentNetWorth);
     saveLocalFallback();
