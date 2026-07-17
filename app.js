@@ -992,3 +992,18 @@ function renderHeatmap() {
     grid.appendChild(cell);
   }
 }
+
+// Currency Formatter
+function formatCurrency(num) {
+  const isNeg = num < 0;
+  const absNum = Math.abs(num);
+  
+  let formatted = '';
+  if (absNum >= 100000) {
+    formatted = (absNum / 100000).toFixed(2) + ' Lakhs';
+  } else {
+    formatted = absNum.toLocaleString('en-IN');
+  }
+
+  return (isNeg ? '-' : '') + '₹' + formatted;
+}
