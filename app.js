@@ -33,6 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
   currentCalendarYear = initDate.getFullYear();
   selectedDateStr = formatDateString(initDate);
 
+  // Sync Date Input Field
+  document.getElementById('entry-date').value = selectedDateStr;
+
   // Setup Event Listeners
   setupEventListeners();
 
@@ -62,7 +65,6 @@ async function loadData() {
     updateUI();
   } catch (err) {
     console.error("Failed to load state from Neon DB, running local fallback", err);
-    // Local storage fallback if offline
     const local = localStorage.getItem('sams_wealth_local_fallback');
     if (local) {
       state = JSON.parse(local);
@@ -71,13 +73,30 @@ async function loadData() {
   }
 }
 
-// Save backup copy to local storage just in case
+// Save backup copy to local storage
 function saveLocalFallback() {
   localStorage.setItem('sams_wealth_local_fallback', JSON.stringify(state));
 }
 
 // Setup Event Listeners
 function setupEventListeners() {
+  // Sync Date Input changes to selected Date Str & Calendar scroll position
+  document.getElementById('entry-date').addEventListener('change', (e) => {
+    const inputDateVal = e.target.value;
+    if (!inputDateVal) return;
+    
+    selectedDateStr = inputDateVal;
+    
+    // Parse month/year from date to auto-scroll calendar if needed
+    const parsedDate = new Date(inputDateVal);
+    if (!isNaN(parsedDate.getTime())) {
+      currentCalendarMonth = parsedDate.getMonth();
+      currentCalendarYear = parsedDate.getFullYear();
+    }
+    
+    updateUI();
+  });
+
   // Bank & Debt Form Submission
   document.getElementById('bank-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -92,12 +111,10 @@ function setupEventListeners() {
         body: JSON.stringify({ bankBalance: bankVal, debtBalance: debtVal, budgetLimit: budgetVal })
       });
       if (res.ok) {
-        // Reload fresh state from DB to sync charts and history
         await loadData();
       }
     } catch (err) {
       console.error('Failed to update portfolio on DB', err);
-      // Fallback update
       state.bankBalance = bankVal;
       state.debtBalance = debtVal;
       state.budgetLimit = budgetVal;
@@ -134,10 +151,12 @@ function setupEventListeners() {
     const type = document.getElementById('entry-type').value;
     const amount = parseFloat(document.getElementById('entry-amount').value) || 0;
     const category = document.getElementById('entry-category').value;
-    const description = document.getElementById('entry-desc').value.trim();
+    const description = document.getElementById('entry-desc').value.trim() || category; // Fallback to category if empty
     const autoAdjust = document.getElementById('auto-adjust-balance').checked;
-
-    if (!selectedDateStr) return;
+    
+    const dateVal = document.getElementById('entry-date').value;
+    if (!dateVal) return;
+    selectedDateStr = dateVal;
 
     const newLog = {
       id: Date.now().toString(),
@@ -157,7 +176,6 @@ function setupEventListeners() {
       });
       if (res.ok) {
         await loadData();
-        // Reset log fields
         document.getElementById('entry-amount').value = '';
         document.getElementById('entry-desc').value = '';
       }
@@ -189,7 +207,7 @@ function setupEventListeners() {
     exportToCSV();
   });
 
-  // Import Data Button Logic (JSON RESTORE)
+  // Import Data JSON
   const fileInput = document.getElementById('import-file');
   document.getElementById('import-btn-trigger').addEventListener('click', () => {
     fileInput.click();
@@ -204,14 +222,8 @@ function setupEventListeners() {
       try {
         const importedState = JSON.parse(evt.target.result);
         if (typeof importedState.bankBalance === 'number' && Array.isArray(importedState.transactions)) {
-          
-          // Seed the whole imported state to DB
-          // For simplicity we can update the backend with all transactions
-          // But to prevent complex batch REST API imports, we can directly update cash and run loop for transactions.
-          // Let's notify user and update state.
           state = importedState;
           
-          // Push cash updates
           await fetch('/api/portfolio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -228,12 +240,11 @@ function setupEventListeners() {
             body: JSON.stringify({ stockInvestment: state.stockInvestment })
           });
 
-          // Upload transactions sequentially
           for (let t of state.transactions) {
             await fetch('/api/transaction', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...t, autoAdjusted: false }) // Avoid duplicate balance updates
+              body: JSON.stringify({ ...t, autoAdjusted: false })
             });
           }
 
@@ -375,16 +386,15 @@ function updateTrendIndicators(currentNetWorth) {
   
   const sortedHistory = [...state.netWorthHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
   
-  if (sortedHistory.length < 2) {
-    trendHeader.className = 'header-trend-wrapper no-change';
-    trendHeader.innerHTML = '<span>No Change</span>';
-    trendStatBox.textContent = '0.00%';
-    trendStatBox.style.color = 'var(--text-muted)';
-    return;
+  let prevNetWorth = GOAL_START;
+  
+  if (sortedHistory.length >= 2) {
+    const prevRecord = sortedHistory[sortedHistory.length - 2];
+    prevNetWorth = prevRecord.netWorth;
+  } else {
+    // If only 1 entry, compare directly to baseline goal start
+    prevNetWorth = GOAL_START;
   }
-
-  const prevRecord = sortedHistory[sortedHistory.length - 2];
-  const prevNetWorth = prevRecord.netWorth;
 
   if (prevNetWorth === 0) {
     trendHeader.className = 'header-trend-wrapper no-change';
@@ -579,21 +589,6 @@ function toggleBreakdownTab(tab) {
   renderBreakdownChart();
 }
 
-// Currency Formatter
-function formatCurrency(num) {
-  const isNeg = num < 0;
-  const absNum = Math.abs(num);
-  
-  let formatted = '';
-  if (absNum >= 100000) {
-    formatted = (absNum / 100000).toFixed(2) + ' Lakhs';
-  } else {
-    formatted = absNum.toLocaleString('en-IN');
-  }
-
-  return (isNeg ? '-' : '') + '₹' + formatted;
-}
-
 // Render Calendar Logic
 function renderCalendar() {
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -652,6 +647,9 @@ function renderCalendar() {
     dayCell.addEventListener('click', () => {
       selectedDateStr = cellDateStr;
       
+      // Sync Date input field when selecting cell
+      document.getElementById('entry-date').value = selectedDateStr;
+
       const cells = daysGrid.querySelectorAll('.calendar-day');
       cells.forEach(c => c.classList.remove('selected'));
       dayCell.classList.add('selected');
@@ -730,7 +728,6 @@ async function deleteTransaction(id) {
     }
   } catch (err) {
     console.error('Failed to delete transaction on DB', err);
-    // Local fallback reversal
     const transIndex = state.transactions.findIndex(t => t.id === id);
     if (transIndex === -1) return;
 

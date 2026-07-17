@@ -11,13 +11,27 @@ app.use(express.json());
 
 const { Pool } = pg;
 
-// Use the database connection string from environment variables
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
   }
 });
+
+// Helper to format PostgreSQL dates safely
+function formatDbDate(dbDate) {
+  if (!dbDate) return '';
+  if (dbDate instanceof Date) {
+    return dbDate.toISOString().split('T')[0];
+  }
+  if (typeof dbDate === 'string') {
+    if (dbDate.includes('T')) {
+      return dbDate.split('T')[0];
+    }
+    return dbDate.split(' ')[0];
+  }
+  return dbDate;
+}
 
 // Database Tables Initialization SQL
 const INIT_DB_SQL = `
@@ -35,7 +49,7 @@ const INIT_DB_SQL = `
     type VARCHAR(10) NOT NULL,
     amount NUMERIC NOT NULL,
     category VARCHAR(50) NOT NULL,
-    description TEXT NOT NULL,
+    description TEXT,
     auto_adjusted BOOLEAN DEFAULT TRUE
   );
 
@@ -93,7 +107,6 @@ app.get('/api/state', async (req, res) => {
 
     const portfolio = portRes.rows[0] || { bank_balance: 0, debt_balance: -500000, stock_investment: 0, budget_limit: 0 };
     
-    // Map database columns (snake_case) to client properties (camelCase)
     const state = {
       bankBalance: parseFloat(portfolio.bank_balance),
       debtBalance: parseFloat(portfolio.debt_balance),
@@ -101,15 +114,15 @@ app.get('/api/state', async (req, res) => {
       budgetLimit: parseFloat(portfolio.budget_limit),
       transactions: transRes.rows.map(t => ({
         id: t.id,
-        date: t.date.toISOString().split('T')[0],
+        date: formatDbDate(t.date),
         type: t.type,
         amount: parseFloat(t.amount),
         category: t.category,
-        description: t.description,
+        description: t.description || t.category, // Default description to category if null
         autoAdjusted: t.auto_adjusted
       })),
       netWorthHistory: histRes.rows.map(h => ({
-        date: h.date.toISOString().split('T')[0],
+        date: formatDbDate(h.date),
         netWorth: parseFloat(h.net_worth)
       }))
     };
@@ -132,7 +145,6 @@ app.post('/api/portfolio', async (req, res) => {
       [bankBalance, debtBalance, budgetLimit]
     );
 
-    // Recalculate Net Worth and record Snapshot
     const portRes = await pool.query('SELECT stock_investment FROM portfolio LIMIT 1');
     const stockVal = parseFloat(portRes.rows[0]?.stock_investment || 0);
     const netWorth = bankBalance + stockVal + debtBalance;
@@ -163,7 +175,6 @@ app.post('/api/stock', async (req, res) => {
       [stockInvestment]
     );
 
-    // Recalculate Net Worth and record Snapshot
     const portRes = await pool.query('SELECT bank_balance, debt_balance FROM portfolio LIMIT 1');
     const bankVal = parseFloat(portRes.rows[0]?.bank_balance || 0);
     const debtVal = parseFloat(portRes.rows[0]?.debt_balance || 0);
@@ -188,6 +199,10 @@ app.post('/api/stock', async (req, res) => {
 app.post('/api/transaction', async (req, res) => {
   const { id, date, type, amount, category, description, autoAdjusted } = req.body;
   const client = await pool.connect();
+  
+  // Default description to category if empty
+  const finalDescription = (description && description.trim() !== '') ? description.trim() : category;
+
   try {
     await client.query('BEGIN');
     
@@ -195,7 +210,7 @@ app.post('/api/transaction', async (req, res) => {
     await client.query(
       `INSERT INTO transactions (id, date, type, amount, category, description, auto_adjusted) 
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, date, type, amount, category, description, autoAdjusted]
+      [id, date, type, amount, category, finalDescription, autoAdjusted]
     );
 
     // If autoAdjusted, update portfolio cash balance
@@ -271,7 +286,7 @@ app.delete('/api/transaction/:id', async (req, res) => {
     const stockVal = parseFloat(portRes.rows[0].stock_investment);
     const netWorth = bankVal + stockVal + debtVal;
 
-    const tDateStr = t.date.toISOString().split('T')[0];
+    const tDateStr = formatDbDate(t.date);
     await client.query(
       `INSERT INTO net_worth_history (date, net_worth) 
        VALUES ($1, $2) 
