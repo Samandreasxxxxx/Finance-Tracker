@@ -50,7 +50,10 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadData() {
   try {
     const res = await fetch('/api/state');
-    if (!res.ok) throw new Error('Database response not OK');
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Server returned ${res.status}: ${errText}`);
+    }
     const dbState = await res.json();
     
     state = dbState;
@@ -65,6 +68,7 @@ async function loadData() {
     updateUI();
   } catch (err) {
     console.error("Failed to load state from Neon DB, running local fallback", err);
+    alert("Database connection offline. Showing local cache fallback data. Error: " + err.message);
     const local = localStorage.getItem('sams_wealth_local_fallback');
     if (local) {
       state = JSON.parse(local);
@@ -110,11 +114,14 @@ function setupEventListeners() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bankBalance: bankVal, debtBalance: debtVal, budgetLimit: budgetVal })
       });
-      if (res.ok) {
-        await loadData();
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText);
       }
+      await loadData();
     } catch (err) {
       console.error('Failed to update portfolio on DB', err);
+      alert('Failed to update portfolio on DB: ' + err.message);
       state.bankBalance = bankVal;
       state.debtBalance = debtVal;
       state.budgetLimit = budgetVal;
@@ -134,11 +141,14 @@ function setupEventListeners() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stockInvestment: stockVal })
       });
-      if (res.ok) {
-        await loadData();
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText);
       }
+      await loadData();
     } catch (err) {
       console.error('Failed to update stock investment on DB', err);
+      alert('Failed to update stocks on DB: ' + err.message);
       state.stockInvestment = stockVal;
       saveLocalFallback();
       updateUI();
@@ -174,13 +184,16 @@ function setupEventListeners() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newLog)
       });
-      if (res.ok) {
-        await loadData();
-        document.getElementById('entry-amount').value = '';
-        document.getElementById('entry-desc').value = '';
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText);
       }
+      await loadData();
+      document.getElementById('entry-amount').value = '';
+      document.getElementById('entry-desc').value = '';
     } catch (err) {
       console.error('Failed to save transaction on DB', err);
+      alert('Failed to save transaction on DB: ' + err.message);
       state.transactions.push(newLog);
       if (autoAdjust) {
         if (type === 'gain') state.bankBalance += amount;
@@ -723,11 +736,14 @@ function updateSelectedDateUI() {
 async function deleteTransaction(id) {
   try {
     const res = await fetch(`/api/transaction/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      await loadData();
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText);
     }
+    await loadData();
   } catch (err) {
     console.error('Failed to delete transaction on DB', err);
+    alert('Failed to delete transaction on DB: ' + err.message);
     const transIndex = state.transactions.findIndex(t => t.id === id);
     if (transIndex === -1) return;
 
