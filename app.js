@@ -611,10 +611,14 @@ function updateTrendIndicators(currentNetWorth) {
   }
 
   if (prevNetWorth === 0) {
-    trendHeader.className = 'header-trend-wrapper no-change';
-    trendHeader.innerHTML = '<span>0.00%</span>';
-    trendStatBox.textContent = '0.00%';
-    trendStatBox.style.color = 'var(--text-muted)';
+    if (trendHeader) {
+      trendHeader.className = 'header-trend-wrapper no-change';
+      trendHeader.innerHTML = '<span>0.00%</span>';
+    }
+    if (trendStatBox) {
+      trendStatBox.textContent = '0.00%';
+      trendStatBox.style.color = 'var(--text-muted)';
+    }
     return;
   }
 
@@ -622,20 +626,32 @@ function updateTrendIndicators(currentNetWorth) {
   const changePercent = (changeVal / Math.abs(prevNetWorth)) * 100;
 
   if (changeVal > 0) {
-    trendHeader.className = 'header-trend-wrapper up';
-    trendHeader.innerHTML = `<i data-lucide="arrow-up-right" style="width: 14px; height: 14px;"></i><span>▲ ${changePercent.toFixed(2)}%</span>`;
-    trendStatBox.textContent = `+${changePercent.toFixed(2)}%`;
-    trendStatBox.style.color = 'var(--success-green)';
+    if (trendHeader) {
+      trendHeader.className = 'header-trend-wrapper up';
+      trendHeader.innerHTML = `<i data-lucide="arrow-up-right" style="width: 14px; height: 14px;"></i><span>▲ ${changePercent.toFixed(2)}%</span>`;
+    }
+    if (trendStatBox) {
+      trendStatBox.textContent = `+${changePercent.toFixed(2)}%`;
+      trendStatBox.style.color = 'var(--success-green)';
+    }
   } else if (changeVal < 0) {
-    trendHeader.className = 'header-trend-wrapper down';
-    trendHeader.innerHTML = `<i data-lucide="arrow-down-right" style="width: 14px; height: 14px;"></i><span>▼ ${Math.abs(changePercent).toFixed(2)}%</span>`;
-    trendStatBox.textContent = `-${Math.abs(changePercent).toFixed(2)}%`;
-    trendStatBox.style.color = 'var(--danger-red)';
+    if (trendHeader) {
+      trendHeader.className = 'header-trend-wrapper down';
+      trendHeader.innerHTML = `<i data-lucide="arrow-down-right" style="width: 14px; height: 14px;"></i><span>▼ ${Math.abs(changePercent).toFixed(2)}%</span>`;
+    }
+    if (trendStatBox) {
+      trendStatBox.textContent = `-${Math.abs(changePercent).toFixed(2)}%`;
+      trendStatBox.style.color = 'var(--danger-red)';
+    }
   } else {
-    trendHeader.className = 'header-trend-wrapper no-change';
-    trendHeader.innerHTML = '<span>No Change</span>';
-    trendStatBox.textContent = '0.00%';
-    trendStatBox.style.color = 'var(--text-muted)';
+    if (trendHeader) {
+      trendHeader.className = 'header-trend-wrapper no-change';
+      trendHeader.innerHTML = '<span>No Change</span>';
+    }
+    if (trendStatBox) {
+      trendStatBox.textContent = '0.00%';
+      trendStatBox.style.color = 'var(--text-muted)';
+    }
   }
   lucide.createIcons();
 }
@@ -643,6 +659,7 @@ function updateTrendIndicators(currentNetWorth) {
 // Calculate Saving Streaks
 function updateStreaks() {
   const streakBox = document.getElementById('stat-streak');
+  if (!streakBox) return;
   
   if (state.transactions.length === 0) {
     streakBox.textContent = '0 Days';
