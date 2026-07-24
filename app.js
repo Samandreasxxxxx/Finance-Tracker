@@ -429,17 +429,15 @@ function updateGrowthVelocity() {
   }
 }
 
-// Format date helper: YYYY-MM-DD
+// Format date helper: YYYY-MM-DD (safely preserving local date)
 function formatDateString(date) {
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
   const d = new Date(date);
-  let month = '' + (d.getMonth() + 1);
-  let day = '' + d.getDate();
+  if (isNaN(d.getTime())) return String(date);
   const year = d.getFullYear();
-
-  if (month.length < 2) month = '0' + month;
-  if (day.length < 2) day = '0' + day;
-
-  return [year, month, day].join('-');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // Record/update current date net worth history snapshot

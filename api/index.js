@@ -18,19 +18,19 @@ const pool = new Pool({
   }
 });
 
-// Helper to format PostgreSQL dates safely
+// Helper to format PostgreSQL dates safely without UTC timezone shift
 function formatDbDate(dbDate) {
   if (!dbDate) return '';
   if (dbDate instanceof Date) {
-    return dbDate.toISOString().split('T')[0];
+    const y = dbDate.getFullYear();
+    const m = String(dbDate.getMonth() + 1).padStart(2, '0');
+    const d = String(dbDate.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
   if (typeof dbDate === 'string') {
-    if (dbDate.includes('T')) {
-      return dbDate.split('T')[0];
-    }
-    return dbDate.split(' ')[0];
+    return dbDate.split('T')[0].split(' ')[0];
   }
-  return dbDate;
+  return String(dbDate);
 }
 
 // Database Tables Initialization SQL
