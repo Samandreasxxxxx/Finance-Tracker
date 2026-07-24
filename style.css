@@ -465,19 +465,22 @@ body {
   color: var(--text-dark);
 }
 
-.input-wrapper input {
+.input-wrapper input,
+.input-wrapper input[type="text"] {
   width: 100%;
-  background: transparent;
-  border: none;
-  outline: none;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
   padding: 0.6rem 0.5rem;
   color: var(--text-main);
   font-family: var(--font-family);
   font-size: 0.95rem;
 }
 
-.input-group input[type="text"],
-.input-group select {
+.input-group > input[type="text"],
+.input-group > select {
   background-color: var(--input-bg);
   border: 1px solid var(--input-border);
   border-radius: 6px;
@@ -489,8 +492,8 @@ body {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.input-group input[type="text"]:focus,
-.input-group select:focus {
+.input-group > input[type="text"]:focus,
+.input-group > select:focus {
   border-color: var(--accent-orange);
   box-shadow: 0 0 0 1px var(--accent-orange);
 }
