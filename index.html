@@ -27,6 +27,10 @@
         </div>
       </div>
       <div class="header-actions">
+        <button id="quick-sync-btn" class="btn btn-primary" title="Update Cash, Debt & Stocks in 5 seconds">
+          <i data-lucide="zap"></i>
+          <span>Quick Sync</span>
+        </button>
         <button id="export-csv-btn" class="btn btn-outline" title="Export Ledger to CSV">
           <i data-lucide="table"></i>
           <span>Export CSV</span>
@@ -50,7 +54,11 @@
       <section class="grid-col-12 card hero-card">
         <div class="hero-header">
           <div>
-            <span class="badge">MISSION 2026</span>
+            <div class="hero-badge-group">
+              <span class="badge">MISSION 2026</span>
+              <span class="phase-pill active" id="phase-1-pill">Phase 1: Debt Free (0%)</span>
+              <span class="phase-pill" id="phase-2-pill">Phase 2: +10L Wealth</span>
+            </div>
             <h2>Goal Progress (-5 Lakhs to +10 Lakhs INR)</h2>
           </div>
           <div class="days-remaining">
@@ -172,21 +180,21 @@
           </div>
           <div class="stat-box-row">
             <div class="stat-box-half">
-              <span class="stat-box-label">Daily Required Save</span>
-              <div class="stat-box-subvalue" id="stat-daily-req">₹0</div>
+              <span class="stat-box-label">Growth Pace (vs Last Mo)</span>
+              <div class="stat-box-subvalue" id="stat-mom-velocity">--</div>
             </div>
             <div class="stat-box-half">
-              <span class="stat-box-label">Daily Growth Change</span>
+              <span class="stat-box-label">Growth Change</span>
               <div class="stat-box-subvalue" id="stat-daily-change">0.00%</div>
             </div>
           </div>
           <div class="stat-box-row">
             <div class="stat-box-half">
-              <span class="stat-box-label">Savings Streak</span>
-              <div class="stat-box-subvalue" id="stat-streak">0 Days</div>
+              <span class="stat-box-label">Debt-Free (₹0) Date</span>
+              <div class="stat-box-subvalue" id="stat-debt-free-date">Calculating...</div>
             </div>
             <div class="stat-box-half">
-              <span class="stat-box-label">Projected Goal Hit</span>
+              <span class="stat-box-label">+10L Goal Hit Date</span>
               <div class="stat-box-subvalue" id="stat-projected-date">Calculating...</div>
             </div>
           </div>
@@ -369,6 +377,39 @@
     <footer class="app-footer">
       <p>&copy; 2026 Sam's Networth. Tracking goal achievement towards 10 Lakhs INR savings.</p>
     </footer>
+  <!-- Quick Balance Sync Modal Overlay -->
+  <div id="quick-sync-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i data-lucide="zap" class="orange-text"></i> Quick Balance Sync (5-Second Update)</h3>
+        <button id="close-quick-sync-modal" class="btn-icon">&times;</button>
+      </div>
+      <p class="modal-subtext">Enter your latest balances below to update your net worth instantly.</p>
+      <form id="quick-sync-form" class="log-form">
+        <div class="input-group">
+          <label for="qs-bank">Cash / Bank Balance (INR)</label>
+          <div class="input-wrapper">
+            <span class="input-prefix">₹</span>
+            <input type="text" inputmode="decimal" id="qs-bank" placeholder="e.g. 25000">
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="qs-debt">Outstanding Debt (INR)</label>
+          <div class="input-wrapper">
+            <span class="input-prefix">₹</span>
+            <input type="text" inputmode="decimal" id="qs-debt" placeholder="e.g. -500000">
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="qs-stock">Stock Assets (INR)</label>
+          <div class="input-wrapper">
+            <span class="input-prefix">₹</span>
+            <input type="text" inputmode="decimal" id="qs-stock" placeholder="e.g. 50000">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Sync All Balances Now</button>
+      </form>
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>

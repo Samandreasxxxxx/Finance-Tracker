@@ -328,9 +328,96 @@ function setupEventListeners() {
   document.getElementById('tab-mix').addEventListener('click', () => {
     toggleBreakdownTab('mix');
   });
-  document.getElementById('tab-spend').addEventListener('click', () => {
-    toggleBreakdownTab('spend');
+  // Quick Sync Modal Triggers & Form Submission
+  const qsModal = document.getElementById('quick-sync-modal');
+  const qsBtn = document.getElementById('quick-sync-btn');
+  const closeQsBtn = document.getElementById('close-quick-sync-modal');
+
+  if (qsBtn && qsModal) {
+    qsBtn.addEventListener('click', () => {
+      document.getElementById('qs-bank').value = state.bankBalance;
+      document.getElementById('qs-debt').value = state.debtBalance;
+      document.getElementById('qs-stock').value = state.stockInvestment;
+      qsModal.style.display = 'flex';
+    });
+  }
+
+  if (closeQsBtn && qsModal) {
+    closeQsBtn.addEventListener('click', () => {
+      qsModal.style.display = 'none';
+    });
+  }
+
+  document.getElementById('quick-sync-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const bankVal = parseMoneyInput(document.getElementById('qs-bank').value);
+    const debtVal = parseMoneyInput(document.getElementById('qs-debt').value);
+    const stockVal = parseMoneyInput(document.getElementById('qs-stock').value);
+
+    try {
+      await fetch('/api/portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankBalance: bankVal, debtBalance: debtVal, budgetLimit: state.budgetLimit || 0 })
+      });
+
+      await fetch('/api/stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stockInvestment: stockVal })
+      });
+
+      qsModal.style.display = 'none';
+      await loadData();
+    } catch (err) {
+      console.error('Failed quick sync on DB', err);
+      alert('Quick sync failed: ' + err.message);
+      state.bankBalance = bankVal;
+      state.debtBalance = debtVal;
+      state.stockInvestment = stockVal;
+      saveLocalFallback();
+      updateUI();
+      qsModal.style.display = 'none';
+    }
   });
+}
+
+// Calculate Month-over-Month Growth Pace Velocity
+function updateGrowthVelocity() {
+  const velEl = document.getElementById('stat-mom-velocity');
+  if (!velEl) return;
+
+  const today = new Date();
+  const thisYear = today.getFullYear();
+  const thisMonth = today.getMonth();
+
+  const prevMonthDate = new Date(thisYear, thisMonth - 1, 1);
+  const prevYear = prevMonthDate.getFullYear();
+  const prevMonth = prevMonthDate.getMonth();
+
+  const getNetForMonth = (yr, mo) => {
+    return state.transactions
+      .filter(t => {
+        const d = new Date(t.date);
+        return d.getFullYear() === yr && d.getMonth() === mo;
+      })
+      .reduce((sum, t) => sum + (t.type === 'gain' ? t.amount : -t.amount), 0);
+  };
+
+  const thisMonthNet = getNetForMonth(thisYear, thisMonth);
+  const lastMonthNet = getNetForMonth(prevYear, prevMonth);
+  const diff = thisMonthNet - lastMonthNet;
+
+  if (diff > 0) {
+    velEl.textContent = `▲ +₹${diff.toLocaleString('en-IN')}`;
+    velEl.style.color = 'var(--success-green)';
+  } else if (diff < 0) {
+    velEl.textContent = `▼ -₹${Math.abs(diff).toLocaleString('en-IN')}`;
+    velEl.style.color = 'var(--danger-red)';
+  } else {
+    velEl.textContent = `Same Pace`;
+    velEl.style.color = 'var(--text-muted)';
+  }
 }
 
 // Format date helper: YYYY-MM-DD
@@ -365,6 +452,25 @@ function updateUI() {
   
   // 1. Update Core Net Worth Stats
   document.getElementById('stat-net-worth').textContent = formatCurrency(currentNetWorth);
+
+  // Phase Pills Update
+  const phase1Pill = document.getElementById('phase-1-pill');
+  const phase2Pill = document.getElementById('phase-2-pill');
+  if (phase1Pill && phase2Pill) {
+    if (currentNetWorth < 0) {
+      const debtClearedPct = Math.min(100, Math.max(0, Math.floor(((currentNetWorth - GOAL_START) / Math.abs(GOAL_START)) * 100)));
+      phase1Pill.textContent = `Phase 1: Debt Free (${debtClearedPct}% Paid)`;
+      phase1Pill.classList.add('active');
+      phase2Pill.textContent = `Phase 2: +10L Wealth (0%)`;
+      phase2Pill.classList.remove('active');
+    } else {
+      phase1Pill.textContent = `Phase 1: Debt Free (100%)`;
+      phase1Pill.classList.remove('active');
+      const wealthPct = Math.min(100, Math.max(0, Math.floor((currentNetWorth / GOAL_TARGET) * 100)));
+      phase2Pill.textContent = `Phase 2: +10L Wealth (${wealthPct}%)`;
+      phase2Pill.classList.add('active');
+    }
+  }
 
   // 2. Goal Calculations & Progress Bar
   const totalRange = GOAL_TARGET - GOAL_START; // 15L range
@@ -405,13 +511,8 @@ function updateUI() {
   const daysRemaining = Math.max(0, Math.ceil(timeDiff / (1000 * 60 * 60 * 24)));
   document.getElementById('days-left').textContent = daysRemaining;
 
-  // Required Savings Daily calculation
-  const reqDailyText = document.getElementById('stat-daily-req');
-  if (targetRemaining > 0 && daysRemaining > 0) {
-    reqDailyText.textContent = formatCurrency(Math.ceil(targetRemaining / daysRemaining));
-  } else {
-    reqDailyText.textContent = '₹0';
-  }
+  // Growth Velocity Pace
+  updateGrowthVelocity();
 
   // 4. Calculate Percentage Growth Change from Yesterday
   updateTrendIndicators(currentNetWorth);
@@ -564,13 +665,23 @@ function updateStreaks() {
   streakBox.textContent = `${streak} Day${streak !== 1 ? 's' : ''}`;
 }
 
-// Calculate projected goal date
+// Calculate projected debt-free and goal target dates
 function updateProjections(currentNetWorth) {
+  const debtFreeBox = document.getElementById('stat-debt-free-date');
   const projBox = document.getElementById('stat-projected-date');
+  
+  if (currentNetWorth >= 0) {
+    if (debtFreeBox) {
+      debtFreeBox.textContent = 'Debt Free!';
+      debtFreeBox.style.color = 'var(--success-green)';
+    }
+  }
+
   const sortedHistory = [...state.netWorthHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
   
   if (sortedHistory.length < 2) {
-    projBox.textContent = 'Need Data';
+    if (currentNetWorth < 0 && debtFreeBox) debtFreeBox.textContent = 'Need Data';
+    if (projBox) projBox.textContent = 'Need Data';
     return;
   }
 
@@ -583,7 +694,8 @@ function updateProjections(currentNetWorth) {
   const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
 
   if (daysDiff <= 0) {
-    projBox.textContent = 'Need Data';
+    if (currentNetWorth < 0 && debtFreeBox) debtFreeBox.textContent = 'Need Data';
+    if (projBox) projBox.textContent = 'Need Data';
     return;
   }
 
@@ -591,21 +703,34 @@ function updateProjections(currentNetWorth) {
   const dailyVelocity = netWorthDelta / daysDiff;
 
   if (dailyVelocity <= 0) {
-    projBox.textContent = 'No growth';
+    if (currentNetWorth < 0 && debtFreeBox) debtFreeBox.textContent = 'No growth';
+    if (projBox) projBox.textContent = 'No growth';
     return;
   }
 
-  const remainingToGoal = GOAL_TARGET - currentNetWorth;
-  if (remainingToGoal <= 0) {
-    projBox.textContent = 'Goal Met!';
-    return;
+  // Calculate Debt-Free Target Date (if still in debt)
+  if (currentNetWorth < 0 && debtFreeBox) {
+    const daysToDebtFree = Math.ceil((0 - currentNetWorth) / dailyVelocity);
+    const debtFreeDate = new Date();
+    debtFreeDate.setDate(debtFreeDate.getDate() + daysToDebtFree);
+    debtFreeBox.textContent = debtFreeDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    debtFreeBox.style.color = 'var(--accent-orange)';
   }
 
-  const daysToGoal = Math.ceil(remainingToGoal / dailyVelocity);
-  const projectedDate = new Date();
-  projectedDate.setDate(projectedDate.getDate() + daysToGoal);
-
-  projBox.textContent = projectedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  // Calculate Goal Target Date (+10L)
+  if (projBox) {
+    const remainingToGoal = GOAL_TARGET - currentNetWorth;
+    if (remainingToGoal <= 0) {
+      projBox.textContent = 'Goal Met!';
+      projBox.style.color = 'var(--success-green)';
+    } else {
+      const daysToGoal = Math.ceil(remainingToGoal / dailyVelocity);
+      const projectedDate = new Date();
+      projectedDate.setDate(projectedDate.getDate() + daysToGoal);
+      projBox.textContent = projectedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      projBox.style.color = 'var(--text-main)';
+    }
+  }
 }
 
 // Monthly budget tracking
