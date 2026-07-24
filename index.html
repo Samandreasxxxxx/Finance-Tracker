@@ -307,12 +307,14 @@
           <button type="submit" class="btn btn-primary btn-block">Save Entry</button>
         </form>
 
-        <!-- Existing logs list for the selected day -->
+        <!-- Activity Ledger list -->
         <div class="day-logs-section">
-          <h4>Logs for selected day</h4>
+          <div class="day-logs-header">
+            <h4 id="logs-list-title">All Activity Entries (<span id="total-logs-count">0</span>)</h4>
+            <button id="clear-date-filter-btn" class="btn-link-sm" style="display: none;">Show All</button>
+          </div>
           <ul id="day-logs-list" class="day-logs-list">
             <!-- Log items injected by JS -->
-            <li class="empty-log-msg">No logs for this date.</li>
           </ul>
         </div>
       </section>

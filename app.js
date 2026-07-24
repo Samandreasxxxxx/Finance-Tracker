@@ -25,6 +25,7 @@ let state = {
 
 // Selected Date for calendar logging
 let selectedDateStr = '';
+let isDateFilterActive = false;
 let currentCalendarMonth = new Date().getMonth();
 let currentCalendarYear = new Date().getFullYear();
 
@@ -127,12 +128,19 @@ function saveLocalFallback() {
 
 // Setup Event Listeners
 function setupEventListeners() {
+  // Clear Date Filter listener
+  document.getElementById('clear-date-filter-btn')?.addEventListener('click', () => {
+    isDateFilterActive = false;
+    updateSelectedDateUI();
+  });
+
   // Sync Date Input changes to selected Date Str & Calendar scroll position
   document.getElementById('entry-date').addEventListener('change', (e) => {
     const inputDateVal = e.target.value;
     if (!inputDateVal) return;
     
     selectedDateStr = inputDateVal;
+    isDateFilterActive = true;
     
     // Parse month/year from date to auto-scroll calendar if needed
     const parsedDate = new Date(inputDateVal);
@@ -866,6 +874,7 @@ function renderCalendar() {
 
     dayCell.addEventListener('click', () => {
       selectedDateStr = cellDateStr;
+      isDateFilterActive = true;
       
       // Sync Date input field when selecting cell
       document.getElementById('entry-date').value = selectedDateStr;
@@ -906,26 +915,56 @@ function updateSelectedDateUI() {
   lucide.createIcons();
 
   const logsList = document.getElementById('day-logs-list');
+  const titleEl = document.getElementById('logs-list-title');
+  const clearBtn = document.getElementById('clear-date-filter-btn');
+
   logsList.innerHTML = '';
 
-  const dayTransactions = state.transactions.filter(t => t.date === selectedDateStr);
+  let displayTransactions = [];
 
-  if (dayTransactions.length === 0) {
-    logsList.innerHTML = '<li class="empty-log-msg">No logs for this date.</li>';
+  if (isDateFilterActive) {
+    displayTransactions = state.transactions.filter(t => t.date === selectedDateStr);
+    if (titleEl) titleEl.innerHTML = `Logs for ${dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} (<span id="total-logs-count">${displayTransactions.length}</span>)`;
+    if (clearBtn) clearBtn.style.display = 'inline-block';
+  } else {
+    displayTransactions = [...state.transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (titleEl) titleEl.innerHTML = `All Activity Entries (<span id="total-logs-count">${displayTransactions.length}</span>)`;
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+
+  if (displayTransactions.length === 0) {
+    if (isDateFilterActive) {
+      logsList.innerHTML = `<li class="empty-log-msg">No logs for ${dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}. <a href="#" id="view-all-link" style="color:var(--accent-orange); font-weight:600;">View all ${state.transactions.length} entries</a></li>`;
+      const viewAllLink = document.getElementById('view-all-link');
+      if (viewAllLink) {
+        viewAllLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          isDateFilterActive = false;
+          updateSelectedDateUI();
+        });
+      }
+    } else {
+      logsList.innerHTML = '<li class="empty-log-msg">No logs recorded yet.</li>';
+    }
     return;
   }
 
-  dayTransactions.forEach(t => {
+  displayTransactions.forEach(t => {
     const li = document.createElement('li');
     li.classList.add('log-item');
     
+    const tDateObj = new Date(t.date);
+    const dateFormatted = !isNaN(tDateObj.getTime()) 
+      ? tDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : t.date;
+
     li.innerHTML = `
       <div class="log-item-details">
         <span class="log-item-desc">${t.description}</span>
-        <span class="log-item-tag">${t.category || 'Other'} (${t.autoAdjusted ? 'Adjusted' : 'Manual'})</span>
+        <span class="log-item-tag">${dateFormatted} • ${t.category || 'Other'}</span>
       </div>
       <div class="log-item-amount ${t.type}">
-        ${t.type === 'gain' ? '+' : '-'}₹${t.amount.toLocaleString('en-IN')}
+        ${t.type === 'gain' ? '+' : '-'}₹${Number(t.amount).toLocaleString('en-IN')}
         <button class="delete-log-btn" data-id="${t.id}" title="Delete Entry">&times;</button>
       </div>
     `;
