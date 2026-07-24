@@ -336,31 +336,32 @@ function setupEventListeners() {
   document.getElementById('tab-mix').addEventListener('click', () => {
     toggleBreakdownTab('mix');
   });
-  // Quick Sync Modal Triggers & Form Submission
-  const qsModal = document.getElementById('quick-sync-modal');
-  const qsBtn = document.getElementById('quick-sync-btn');
-  const closeQsBtn = document.getElementById('close-quick-sync-modal');
+  // Global document click delegation for modal overlays & triggers
+  document.addEventListener('click', (e) => {
+    const syncBtn = e.target.closest('#quick-sync-btn');
+    if (syncBtn) {
+      const qsModal = document.getElementById('quick-sync-modal');
+      if (qsModal) {
+        document.getElementById('qs-bank').value = state.bankBalance;
+        document.getElementById('qs-debt').value = state.debtBalance;
+        document.getElementById('qs-stock').value = state.stockInvestment;
+        qsModal.style.display = 'flex';
+      }
+    }
 
-  if (qsBtn && qsModal) {
-    qsBtn.addEventListener('click', () => {
-      document.getElementById('qs-bank').value = state.bankBalance;
-      document.getElementById('qs-debt').value = state.debtBalance;
-      document.getElementById('qs-stock').value = state.stockInvestment;
-      qsModal.style.display = 'flex';
-    });
-  }
-
-  if (closeQsBtn && qsModal) {
-    closeQsBtn.addEventListener('click', () => {
-      qsModal.style.display = 'none';
-    });
-  }
+    const closeBtn = e.target.closest('#close-quick-sync-modal');
+    if (closeBtn || (e.target.classList && e.target.classList.contains('modal-overlay'))) {
+      const qsModal = document.getElementById('quick-sync-modal');
+      if (qsModal) qsModal.style.display = 'none';
+    }
+  });
 
   document.getElementById('quick-sync-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const bankVal = parseMoneyInput(document.getElementById('qs-bank').value);
     const debtVal = parseMoneyInput(document.getElementById('qs-debt').value);
     const stockVal = parseMoneyInput(document.getElementById('qs-stock').value);
+    const qsModal = document.getElementById('quick-sync-modal');
 
     try {
       await fetch('/api/portfolio', {
@@ -375,7 +376,7 @@ function setupEventListeners() {
         body: JSON.stringify({ stockInvestment: stockVal })
       });
 
-      qsModal.style.display = 'none';
+      if (qsModal) qsModal.style.display = 'none';
       await loadData();
     } catch (err) {
       console.error('Failed quick sync on DB', err);
