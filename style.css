@@ -712,11 +712,38 @@ body {
 
 .calendar-legend {
   display: flex;
-  justify-content: center;
-  gap: 1.25rem;
+  justify-content: space-between;
+  align-items: center;
   font-size: 0.75rem;
   color: var(--text-muted);
-  margin-top: 1rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.legend-items {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.calendar-month-net-container {
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background-color: var(--card-bg-light);
+  border: 1px solid var(--border-color);
+}
+
+.calendar-month-net-container strong.gain {
+  color: var(--success-green);
+}
+
+.calendar-month-net-container strong.loss {
+  color: var(--danger-red);
+}
+
+.calendar-month-net-container strong.neutral {
+  color: var(--text-muted);
 }
 
 .legend-item {

@@ -107,21 +107,21 @@
             <label for="bank-balance">Cash / Bank Balance (INR)</label>
             <div class="input-wrapper">
               <span class="input-prefix">₹</span>
-              <input type="number" id="bank-balance" placeholder="e.g. 0" min="0" step="any">
+              <input type="text" inputmode="decimal" id="bank-balance" placeholder="e.g. 0">
             </div>
           </div>
           <div class="input-group">
             <label for="debt-balance">Outstanding Debt (INR)</label>
             <div class="input-wrapper">
               <span class="input-prefix">₹</span>
-              <input type="number" id="debt-balance" placeholder="e.g. -500000" step="any">
+              <input type="text" inputmode="decimal" id="debt-balance" placeholder="e.g. -500000">
             </div>
           </div>
           <div class="input-group">
             <label for="budget-limit">Monthly Expense Budget (INR)</label>
             <div class="input-wrapper">
               <span class="input-prefix">₹</span>
-              <input type="number" id="budget-limit" placeholder="e.g. 30000" min="0" step="any">
+              <input type="text" inputmode="decimal" id="budget-limit" placeholder="e.g. 30000">
             </div>
           </div>
           <button type="submit" class="btn btn-primary btn-block">Update Cash, Debt & Budget</button>
@@ -151,7 +151,7 @@
             <label for="stock-investment">Stock Assets (INR)</label>
             <div class="input-wrapper">
               <span class="input-prefix">₹</span>
-              <input type="number" id="stock-investment" placeholder="e.g. 0" min="0" step="any">
+              <input type="text" inputmode="decimal" id="stock-investment" placeholder="e.g. 0">
             </div>
             <p class="input-help">Update stocks balance manually whenever you wish</p>
           </div>
@@ -222,8 +222,13 @@
         </div>
 
         <div class="calendar-legend">
-          <span class="legend-item"><span class="dot gain"></span> Gain Logged</span>
-          <span class="legend-item"><span class="dot loss"></span> Loss Logged</span>
+          <div class="legend-items">
+            <span class="legend-item"><span class="dot gain"></span> Gain Logged</span>
+            <span class="legend-item"><span class="dot loss"></span> Loss Logged</span>
+          </div>
+          <div class="calendar-month-net-container" id="cal-month-net-container">
+            Net: <strong id="cal-month-net">₹0</strong>
+          </div>
         </div>
       </section>
 
@@ -249,7 +254,7 @@
               <label for="entry-amount">Amount (INR)</label>
               <div class="input-wrapper">
                 <span class="input-prefix">₹</span>
-                <input type="number" id="entry-amount" placeholder="0" min="0" required>
+                <input type="text" inputmode="decimal" id="entry-amount" placeholder="0" required>
               </div>
             </div>
           </div>

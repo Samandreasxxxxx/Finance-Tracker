@@ -4,6 +4,15 @@ const GOAL_START = -500000; // -5 Lakhs INR
 const GOAL_TARGET = 1000000; // +10 Lakhs INR
 const TARGET_DATE = new Date('2026-12-31');
 
+// Helper to robustly parse money inputs allowing currency symbols, commas, and spaces
+function parseMoneyInput(val) {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  // Remove currency symbols, commas, spaces, and other non-numeric chars except minus sign and decimal point
+  const sanitized = val.replace(/[^\d.-]/g, '');
+  return parseFloat(sanitized) || 0;
+}
+
 // Local State Copy (synced with database)
 let state = {
   bankBalance: 0,
@@ -138,9 +147,9 @@ function setupEventListeners() {
   // Bank & Debt Form Submission
   document.getElementById('bank-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const bankVal = parseFloat(document.getElementById('bank-balance').value) || 0;
-    const debtVal = parseFloat(document.getElementById('debt-balance').value) || 0;
-    const budgetVal = parseFloat(document.getElementById('budget-limit').value) || 0;
+    const bankVal = parseMoneyInput(document.getElementById('bank-balance').value);
+    const debtVal = parseMoneyInput(document.getElementById('debt-balance').value);
+    const budgetVal = parseMoneyInput(document.getElementById('budget-limit').value);
     
     try {
       const res = await fetch('/api/portfolio', {
@@ -167,7 +176,7 @@ function setupEventListeners() {
   // Stock Form Submission
   document.getElementById('stock-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const stockVal = parseFloat(document.getElementById('stock-investment').value) || 0;
+    const stockVal = parseMoneyInput(document.getElementById('stock-investment').value);
     
     try {
       const res = await fetch('/api/stock', {
@@ -193,7 +202,7 @@ function setupEventListeners() {
   document.getElementById('daily-log-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const type = document.getElementById('entry-type').value;
-    const amount = parseFloat(document.getElementById('entry-amount').value) || 0;
+    const amount = parseMoneyInput(document.getElementById('entry-amount').value);
     const category = document.getElementById('entry-category').value;
     const description = document.getElementById('entry-desc').value.trim() || category; // Fallback to category if empty
     const autoAdjust = document.getElementById('auto-adjust-balance').checked;
@@ -451,6 +460,17 @@ function updateCalendarHeaderStats() {
 
   document.getElementById('cal-month-gain').textContent = `₹${monthlyGains.toLocaleString('en-IN')}`;
   document.getElementById('cal-month-loss').textContent = `₹${monthlyLosses.toLocaleString('en-IN')}`;
+
+  const netAmount = monthlyGains - monthlyLosses;
+  const netContainerEl = document.getElementById('cal-month-net-container');
+
+  if (netAmount > 0) {
+    netContainerEl.innerHTML = `Net Saved: <strong id="cal-month-net" class="gain">+₹${netAmount.toLocaleString('en-IN')}</strong>`;
+  } else if (netAmount < 0) {
+    netContainerEl.innerHTML = `Net Lost: <strong id="cal-month-net" class="loss">-₹${Math.abs(netAmount).toLocaleString('en-IN')}</strong>`;
+  } else {
+    netContainerEl.innerHTML = `Net: <strong id="cal-month-net" class="neutral">₹0</strong>`;
+  }
 }
 
 // Calculate and render trend arrow + percentage
