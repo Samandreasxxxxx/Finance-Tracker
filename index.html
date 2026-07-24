@@ -186,22 +186,32 @@
           </div>
           <div class="stat-box-row">
             <div class="stat-box-half">
-              <span class="stat-box-label">Growth Pace (vs Last Mo)</span>
-              <div class="stat-box-subvalue" id="stat-mom-velocity">--</div>
+              <span class="stat-box-label">Pace vs Target</span>
+              <div class="stat-box-subvalue" id="stat-benchmark-pace">Calculating...</div>
             </div>
             <div class="stat-box-half">
-              <span class="stat-box-label">Growth Change</span>
-              <div class="stat-box-subvalue" id="stat-daily-change">0.00%</div>
+              <span class="stat-box-label">MoM Pace Change</span>
+              <div class="stat-box-subvalue" id="stat-mom-velocity">--</div>
             </div>
           </div>
           <div class="stat-box-row">
             <div class="stat-box-half">
-              <span class="stat-box-label">Debt-Free (₹0) Date</span>
+              <span class="stat-box-label">Debt-Free Date</span>
               <div class="stat-box-subvalue" id="stat-debt-free-date">Calculating...</div>
             </div>
             <div class="stat-box-half">
               <span class="stat-box-label">+10L Goal Hit Date</span>
               <div class="stat-box-subvalue" id="stat-projected-date">Calculating...</div>
+            </div>
+          </div>
+          <div class="stat-box-row">
+            <div class="stat-box-half">
+              <span class="stat-box-label">Interest Saved / Mo</span>
+              <div class="stat-box-subvalue green-text" id="stat-interest-saved">₹0 / mo</div>
+            </div>
+            <div class="stat-box-half">
+              <span class="stat-box-label">Daily Growth Change</span>
+              <div class="stat-box-subvalue" id="stat-daily-change">0.00%</div>
             </div>
           </div>
         </div>
@@ -347,6 +357,67 @@
         </div>
         <div class="chart-container-donut">
           <canvas id="breakdownChart"></canvas>
+        </div>
+      </section>
+
+      <!-- What-If Simulator Card (Span 7) -->
+      <section class="grid-col-7 card simulator-card">
+        <h3 class="card-title">
+          <i data-lucide="calculator" class="orange-text"></i>
+          "What-If" Debt & Timeline Accelerator
+        </h3>
+        <p class="card-subtext">Simulate how extra lump-sum payments accelerate your path to ₹0 Debt & +10L Goal.</p>
+        
+        <div class="sim-input-box">
+          <label for="sim-extra-lump">Extra One-Time Lump Sum Payment (INR)</label>
+          <div class="input-wrapper">
+            <span class="input-prefix">₹</span>
+            <input type="text" inputmode="decimal" id="sim-extra-lump" placeholder="e.g. 50000">
+          </div>
+        </div>
+
+        <div class="sim-output-grid">
+          <div class="sim-output-card">
+            <span class="sim-card-label">Simulated Debt-Free Date</span>
+            <strong id="sim-debt-date" class="sim-card-val">--</strong>
+            <span id="sim-debt-saved" class="sim-badge">0 Months Earlier</span>
+          </div>
+          <div class="sim-output-card">
+            <span class="sim-card-label">Simulated +10L Goal Date</span>
+            <strong id="sim-goal-date" class="sim-card-val">--</strong>
+            <span id="sim-goal-saved" class="sim-badge">0 Months Earlier</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Fixed vs Variable Overhead Breakdown Card (Span 5) -->
+      <section class="grid-col-5 card overhead-card">
+        <h3 class="card-title">
+          <i data-lucide="layers" class="orange-text"></i>
+          Monthly Cost Structure & Overhead
+        </h3>
+        <div class="overhead-list">
+          <div class="overhead-item fixed">
+            <div class="overhead-info">
+              <span>Fixed Obligations (Rent, Loans)</span>
+              <small>Mandatory recurring commitments</small>
+            </div>
+            <strong id="overhead-fixed-val">₹0 / mo</strong>
+          </div>
+          <div class="overhead-item variable">
+            <div class="overhead-info">
+              <span>Variable Spending (Food, CC)</span>
+              <small>Discretionary monthly expenses</small>
+            </div>
+            <strong id="overhead-var-val">₹0 / mo</strong>
+          </div>
+          <div class="overhead-item surplus">
+            <div class="overhead-info">
+              <span>Free Savings Surplus</span>
+              <small>Net monthly accumulation power</small>
+            </div>
+            <strong id="overhead-surplus-val">₹0 / mo</strong>
+          </div>
         </div>
       </section>
 

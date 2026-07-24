@@ -140,6 +140,11 @@ function setupEventListeners() {
     loadData();
   });
 
+  // Simulator Lump Sum input listener
+  document.getElementById('sim-extra-lump')?.addEventListener('input', () => {
+    runDebtSimulation();
+  });
+
   // Clear Date Filter listener
   document.getElementById('clear-date-filter-btn')?.addEventListener('click', () => {
     isDateFilterActive = false;
@@ -533,12 +538,20 @@ function updateUI() {
   // Growth Velocity Pace
   updateGrowthVelocity();
 
+  // Benchmark Trajectory Pace vs Target
+  updateBenchmarkPace(currentNetWorth);
+
+  // Monthly Interest Cost Saved
+  updateInterestSaved();
+
   // 4. Calculate Percentage Growth Change from Yesterday
   updateTrendIndicators(currentNetWorth);
 
-  // 5. Streaks and Forecast Projections
+  // 5. Forecast Projections, Simulator & Overhead Structure
   updateStreaks();
   updateProjections(currentNetWorth);
+  runDebtSimulation();
+  updateOverheadBreakdown();
 
   // 6. Monthly Budget checks
   updateBudget();
@@ -1279,4 +1292,158 @@ function formatCurrency(num) {
   }
 
   return (isNeg ? '-' : '') + '₹' + formatted;
+}
+
+// Calculate target benchmark pace vs 2026 trajectory
+function updateBenchmarkPace(currentNetWorth) {
+  const paceBox = document.getElementById('stat-benchmark-pace');
+  if (!paceBox) return;
+
+  const startDate = new Date('2026-01-01');
+  const targetDate = new Date('2026-12-31');
+  const today = new Date();
+
+  const totalTime = targetDate - startDate;
+  const elapsedTime = Math.max(0, Math.min(totalTime, today - startDate));
+  const progressFrac = elapsedTime / totalTime;
+
+  const expectedNetWorth = GOAL_START + (GOAL_TARGET - GOAL_START) * progressFrac;
+  const diff = currentNetWorth - expectedNetWorth;
+
+  if (diff > 0) {
+    paceBox.textContent = `+₹${Math.round(diff).toLocaleString('en-IN')} Ahead`;
+    paceBox.style.color = 'var(--success-green)';
+  } else if (diff < 0) {
+    paceBox.textContent = `-₹${Math.abs(Math.round(diff)).toLocaleString('en-IN')} Behind`;
+    paceBox.style.color = 'var(--danger-red)';
+  } else {
+    paceBox.textContent = 'On Pace';
+    paceBox.style.color = 'var(--text-muted)';
+  }
+}
+
+// Calculate interest saved per month based on debt reduction
+function updateInterestSaved() {
+  const interestBox = document.getElementById('stat-interest-saved');
+  if (!interestBox) return;
+
+  // Assuming 10% annual interest on debt
+  const annualRate = 0.10;
+  const baselineMonthlyInterest = Math.abs(GOAL_START) * (annualRate / 12);
+  
+  const currentDebt = Math.max(0, Math.abs(Math.min(0, state.debtBalance)));
+  const currentMonthlyInterest = currentDebt * (annualRate / 12);
+  
+  const saved = Math.max(0, baselineMonthlyInterest - currentMonthlyInterest);
+
+  interestBox.textContent = `+₹${Math.round(saved).toLocaleString('en-IN')} / mo`;
+}
+
+// Interactive "What-If" Debt & Goal Simulator
+function runDebtSimulation() {
+  const lumpInput = document.getElementById('sim-extra-lump');
+  const debtDateEl = document.getElementById('sim-debt-date');
+  const debtSavedEl = document.getElementById('sim-debt-saved');
+  const goalDateEl = document.getElementById('sim-goal-date');
+  const goalSavedEl = document.getElementById('sim-goal-saved');
+
+  if (!lumpInput || !debtDateEl || !goalDateEl) return;
+
+  const extraLump = parseMoneyInput(lumpInput.value);
+  const currentNetWorth = state.bankBalance + state.stockInvestment + state.debtBalance;
+  const simNetWorth = currentNetWorth + extraLump;
+
+  const sortedHistory = [...state.netWorthHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+  let dailyVelocity = 0;
+
+  if (sortedHistory.length >= 2) {
+    const firstRec = sortedHistory[0];
+    const lastRec = sortedHistory[sortedHistory.length - 1];
+    const daysDiff = Math.max(1, Math.ceil((new Date(lastRec.date) - new Date(firstRec.date)) / (1000 * 60 * 60 * 24)));
+    dailyVelocity = (lastRec.netWorth - firstRec.netWorth) / daysDiff;
+  }
+
+  if (dailyVelocity <= 0) dailyVelocity = 1000; // Fallback velocity
+
+  // Baseline Days
+  const baseDaysToDebt = currentNetWorth < 0 ? Math.ceil((0 - currentNetWorth) / dailyVelocity) : 0;
+  const baseDaysToGoal = Math.max(0, Math.ceil((GOAL_TARGET - currentNetWorth) / dailyVelocity));
+
+  // Simulated Days
+  const simDaysToDebt = simNetWorth < 0 ? Math.ceil((0 - simNetWorth) / dailyVelocity) : 0;
+  const simDaysToGoal = Math.max(0, Math.ceil((GOAL_TARGET - simNetWorth) / dailyVelocity));
+
+  // Render Debt Date
+  if (simNetWorth >= 0) {
+    debtDateEl.textContent = 'Debt Free Now!';
+    debtDateEl.style.color = 'var(--success-green)';
+    if (debtSavedEl) debtSavedEl.textContent = '100% Debt Free';
+  } else {
+    const dDate = new Date();
+    dDate.setDate(dDate.getDate() + simDaysToDebt);
+    debtDateEl.textContent = dDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    debtDateEl.style.color = 'var(--accent-orange)';
+    
+    const daysSaved = Math.max(0, baseDaysToDebt - simDaysToDebt);
+    const monthsSaved = (daysSaved / 30.4).toFixed(1);
+    if (debtSavedEl) debtSavedEl.textContent = `${monthsSaved} Months Faster`;
+  }
+
+  // Render Goal Date
+  if (simNetWorth >= GOAL_TARGET) {
+    goalDateEl.textContent = 'Goal Met Now!';
+    goalDateEl.style.color = 'var(--success-green)';
+    if (goalSavedEl) goalSavedEl.textContent = 'Target Met';
+  } else {
+    const gDate = new Date();
+    gDate.setDate(gDate.getDate() + simDaysToGoal);
+    goalDateEl.textContent = gDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    goalDateEl.style.color = 'var(--text-main)';
+
+    const daysSaved = Math.max(0, baseDaysToGoal - simDaysToGoal);
+    const monthsSaved = (daysSaved / 30.4).toFixed(1);
+    if (goalSavedEl) goalSavedEl.textContent = `${monthsSaved} Months Faster`;
+  }
+}
+
+// Calculate Monthly Cost Structure & Overhead Breakdown
+function updateOverheadBreakdown() {
+  const fixedEl = document.getElementById('overhead-fixed-val');
+  const varEl = document.getElementById('overhead-var-val');
+  const surplusEl = document.getElementById('overhead-surplus-val');
+
+  if (!fixedEl || !varEl || !surplusEl) return;
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+
+  const thisMonthTx = state.transactions.filter(t => {
+    const d = new Date(t.date);
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+  });
+
+  const fixedCategories = new Set(['Rent & Housing', 'Utilities']);
+  
+  let fixedSum = 0;
+  let varSum = 0;
+  let gainSum = 0;
+
+  thisMonthTx.forEach(t => {
+    if (t.type === 'gain') {
+      gainSum += t.amount;
+    } else {
+      if (fixedCategories.has(t.category) || (t.description && t.description.toLowerCase().includes('loan'))) {
+        fixedSum += t.amount;
+      } else {
+        varSum += t.amount;
+      }
+    }
+  });
+
+  const surplus = gainSum - (fixedSum + varSum);
+
+  fixedEl.textContent = `₹${fixedSum.toLocaleString('en-IN')} / mo`;
+  varEl.textContent = `₹${varSum.toLocaleString('en-IN')} / mo`;
+  surplusEl.textContent = `${surplus >= 0 ? '+' : '-'}₹${Math.abs(surplus).toLocaleString('en-IN')} / mo`;
 }

@@ -1054,6 +1054,111 @@ body {
 .heatmap-cell.loss-med { background-color: #dc2626cc; }
 .heatmap-cell.loss-high { background-color: #dc2626ff; }
 
+/* Simulator Card & Overhead Breakdown */
+.card-subtext {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: -0.5rem;
+  margin-bottom: 1rem;
+}
+
+.sim-input-box {
+  margin-bottom: 1.25rem;
+}
+
+.sim-input-box label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 0.35rem;
+  display: block;
+}
+
+.sim-output-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.sim-output-card {
+  background-color: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sim-card-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.sim-card-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.sim-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--success-green);
+}
+
+.overhead-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.overhead-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+}
+
+.overhead-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.overhead-info span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.overhead-info small {
+  font-size: 0.7rem;
+  color: var(--text-dark);
+}
+
+.overhead-item.fixed strong {
+  color: var(--danger-red);
+  font-size: 0.95rem;
+}
+
+.overhead-item.variable strong {
+  color: var(--accent-orange);
+  font-size: 0.95rem;
+}
+
+.overhead-item.surplus strong {
+  color: var(--success-green);
+  font-size: 0.95rem;
+}
+
+.green-text {
+  color: var(--success-green) !important;
+}
+
 /* Phase Pills in Hero Header */
 .hero-badge-group {
   display: flex;
