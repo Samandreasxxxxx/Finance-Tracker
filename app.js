@@ -58,6 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Load state from DB
 async function loadData() {
+  const warningBanner = document.getElementById('db-warning-banner');
+  const warningText = document.getElementById('db-warning-text');
+
   try {
     const res = await fetch('/api/state');
     if (!res.ok) {
@@ -71,6 +74,9 @@ async function loadData() {
     
     state = dbState;
     
+    // Hide warning banner on successful Neon connection
+    if (warningBanner) warningBanner.style.display = 'none';
+
     // Sync forms
     document.getElementById('bank-balance').value = state.bankBalance;
     document.getElementById('debt-balance').value = state.debtBalance;
@@ -81,13 +87,14 @@ async function loadData() {
     updateUI();
   } catch (err) {
     console.error("Failed to load state from Neon DB, running local fallback", err);
-    // Don't show annoying database offline alert on first boot if local fallback is present
+    if (warningBanner) {
+      warningBanner.style.display = 'flex';
+      if (warningText) warningText.textContent = `⚠️ Neon DB Disconnected: ${err.message}. (Showing offline fallback).`;
+    }
     const local = localStorage.getItem('sams_wealth_local_fallback');
     if (local) {
       state = JSON.parse(local);
       updateUI();
-    } else {
-      alert("Database connection offline. Showing fallback interface. Error: " + err.message);
     }
   }
 }
@@ -128,6 +135,11 @@ function saveLocalFallback() {
 
 // Setup Event Listeners
 function setupEventListeners() {
+  // Retry Neon DB connection listener
+  document.getElementById('retry-db-btn')?.addEventListener('click', () => {
+    loadData();
+  });
+
   // Clear Date Filter listener
   document.getElementById('clear-date-filter-btn')?.addEventListener('click', () => {
     isDateFilterActive = false;
